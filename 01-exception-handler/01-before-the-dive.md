@@ -1,45 +1,45 @@
-#  Before The Dive
+#  写在前面
 
-Laravel is shipped with two Kernels (cores), one for handling HTTP requests and the other for handling console commands, each Kernel instance has a `handle()` method that receives the input, either an HTTP Request or a Console Input, handles it, and returns a response. The entire handling process is wrapped inside a try...catch:
+Laravel 配有两个内核，一个用于处理 HTTP 请求，另一个则用于处理控制台命令。每个内核的实例中都有一个 `handle()` 方法，用来接收表单输入的内容、HTTP 请求或者控制台输入的内容，然后对这些内容进行处理之后再返回响应。 这整个处理的过程被包装在一个 try … catch 中：
 
 ```php
 try {
     $response = $this->processTheInput($input);
 } catch (Exception $e) {
     $this->reportException($e);
-    // This calls the report() method of `App\Exceptions\Handler`
+    // 这里调用了 `App\Exceptions\Handler` 中的 report() 方法
 
     $response = $this->renderException($request, $e);
-    // This calls the render() method of `App\Exceptions\Handler`
+    // 这里调用了 `App\Exceptions\Handler` 中的 render() 方法
 }
 
 return $response;
 ```
 
-As you can see all exceptions that aren't handled from within your application are caught at this point and then laravel performs two tasks:
+正如你看到的，在应用程序中所有未处理的异常都在这里被捕获，接着 Laravel 会执行两个任务：
 
-1. It reports the exception to different channels as configured.
-2. It converts the exception instance to a displayable format and renders the output to the end user.
+1. 根据配置向相应的 Kernel 汇报异常。
+2. 将异常实例转换为可显示的格式，再输出呈现给最终用户。
 
->The two Kernels are accessed from "app\Http\Kernel.php" for the HTTP Kernel, and "app\Console\Kernel.php" for the console Kernel. Both classes extend their respective base Kernel Illuminate class, it's very interesting to take a deeper look on how things work there.
+>两个内核可以从 HTTP 内核的 “app\Http\Kernel.php” 和控制台内核的 “app\Console\Kernel.php” 访问。 这两个类都扩展了它们各自在 Illuminate 中的 Kernel 基类，深入了解它们是怎么工作是一件非常有趣的事情。
 
-## So that's how all exceptions are handled?
+#### 那么所有的异常都是如何被处理的呢？
 
-There are some situations where exceptions are internally handled, for example inside a daemon queue worker to prevent the script from exiting when a worker encounters an exception while pulling new jobs or executing them Laravel catches exceptions and only reports them but never renders:
+在某些情况下，异常会在内部处理。例如在队列的守护进程中，Laravel 捕获异常但仅做报告而不会呈现，以防止在拉取新作业或在执行它们的过程中遇到异常时脚本退出：
 
 ```php
 try {
-    // Get new jobs or execute a job
+    // 获得新任务或执行任务
 } catch (Exception $e) {
     $this->exceptions->report($e);
 }
 ```
 
-Another interesting behaviour is while handling an exception that's returned during running routes or middleware, before the exception reaches the try..catch statement inside the HTTP Kernel it's actually reported and converted to a response object inside the pipeline, that way exceptions won't stop the script from running all assigned after middleware.
+另一个有趣的行为是在处理运行中的路由或中间件期间返回的异常时，在异常到达 HTTP 的 Kernel内的 try..catch 语句之前，它实际上被报告并转换为管道中的响应对象，这样异常不会停止该脚本运行所有被分配的后置中间件。
 
-## Why would I want that?
+#### 为什么要这样？
 
-For example if you have a middleware that logs all requests & responses passing by your application you'll usually want to register it as an "After Middleware":
+例如，如果你有一个中间件来记录通过应用程序的所有请求和响应，你通常会想要注册一个「后置中间件」：
 
 ```php
 class LoggerMiddleware
@@ -48,16 +48,16 @@ class LoggerMiddleware
     {
         $response = $next($request);
 
-        // Send the request and the response to your logging server.
+        // 发送请求和响应到你的日志服务中
 
         return $response;
     }
 }
 ```
 
-So here any exceptions that occurs in any layer of your application won't stop Laravel from running this after middleware so that you can collect information about the actual response that your user received.
+因此，出现在应用程序中任何层的任何异常都不会停止 Laravel 运行后置中间件，这样你可以收集有关用户收到的实际响应的信息。
 
-You can find information about the actual exception that was thrown by looking into the exception property of the response object:
+你可以通过查看响应对象的 **exception** 属性来查找关于抛出实际异常的信息：
 
 ```php
 if ($response->exception){
@@ -65,22 +65,22 @@ if ($response->exception){
 }
 ```
 
-## In case of any other un-handled exceptions:
+#### 如果有任何未处理的异常：
 
-While bootstrapping the application Laravel sets PHP's error reporting to report all errors, it also assign custom handlers to errors and exceptions:
+在引导应用程序时， Laravel 设置 PHP 的错误报告会报告所有错误，也会为自定义处理程序分配错误和异常：
 
 ```php
-// Turn on error reporting
+// 打开错误报告
 error_reporting(-1);
 
-// Register a custom error handler
+// 注册自定义错误处理程序
 set_error_handler([$this, 'handleError']);
 
-// Register a custom exception handler
+// 注册自定义异常处理程序
 set_exception_handler([$this, 'handleException']);
 
-// Handle when the script is done
+// 当脚本完成时处理
 register_shutdown_function([$this, 'handleShutdown']);
 ```
 
-Inside those custom handlers Laravel tries to format any un-handled exceptions, report them, and present a displayable response to the end user.
+在这些自定义处理程序中，Laravel 尝试格式化任何未处理的异常并将其报告，再给最终的用户呈现可显示的响应。
