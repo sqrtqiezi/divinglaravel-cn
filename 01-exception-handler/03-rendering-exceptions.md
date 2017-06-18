@@ -1,8 +1,8 @@
-# Rendering Exceptions
+# 渲染异常
 
-While rendering an exception Laravel checks if the exception class has a `render()` method, if so it just uses the output of this method to build the response, you can return anything from this method as you normally do within a controller method.
+在渲染异常的时候，Laravel 会检查异常类是否有一个 `render()` 方法。如果有，它就只是使用该方法的输出来构建响应。你可以像平常在控制器方法中做的那样从这个方法返回任何东西。
 
-Laravel tries to convert exceptions into a displayable format depending on the expected response format whether it's HTML or JSON, it first converts various exceptions formats to a simple HTTPException:
+Laravel 尝试将异常转换为你事先决定好的可显示的响应格式。而无论是 HTML 或者 JSON，它都会先将各种各样的异常格式转换为简单的 HTTPException：
 
 ```php
 if ($e instanceof ModelNotFoundException) {
@@ -14,23 +14,23 @@ if ($e instanceof ModelNotFoundException) {
 }
 ```
 
-And then it handles some exceptions in a special way:
+然后它用一种特殊的方式处理来一些异常：
 
-`Illuminate\Http\Exceptions\HttpResponseException` is a special exception in that it already contains the response, so Laravel just returns the response from that exception.
+`Illuminate\Http\Exceptions\HttpResponseException` 是一种特殊的异常，在它里面已经包含了响应，所以 Laravel 只是返回该异常的响应。
 
-## Rendering Authentication Exceptions
+### 渲染认证异常
 
-The `Illuminate\Auth\AuthenticationException` is handled using a method in a `unauthenticated()` method inside your `App\Exceptions`, by default it redirects the user to a `/login` URL in case the expected response format is HTML or returns a JSON object with a 401 status code:
+ `Illuminate\Auth\AuthenticationException` 是用 `App\Exceptions` 的 `unauthenticated()` 方法用依赖注入的方式去处理的。默认情况下，如果事先决定的响应格式是带着 401 状态码的 HTML 或者返回 JSON 对象，那程序就会将用户重定向到 `/login` URL 上。
 
 ```json
 {"message" : "Unauthenticated."}
 ```
 
-Of course you can change the behaviour in this method as you want.
+当然你也可以按照你想要的改变这个方法。
 
-## Rendering Validation Exceptions
+### 渲染验证异常
 
-In case of a `Illuminate\Validation\ValidationException`, laravel redirects the user to the previous URI with the input given in the request as well as an error bag, this gives you the ability to check if the $error variable contains any `$errors` that you can display:
+如果是 `Illuminate\Validation\ValidationException`，Laravel 将用户重定向到先前的 URI，并在给出请求中输入的内容以及错误信息，这样就可以检查 `$errors` 变量是否包含任何可以显示的错误：
 
 ```php
 @if (count($errors) > 0)
@@ -44,7 +44,7 @@ In case of a `Illuminate\Validation\ValidationException`, laravel redirects the 
 @endif
 ```
 
-In case the expected response format is JSON Laravel returns a JSON object with a 422 status code, it looks like this:
+如果事先决定的响应格式是 JSON，Laravel 就返回一个具有 422 状态码的 JSON 对象，它看起来像这样：
 
 ```json
 {
@@ -58,19 +58,19 @@ In case the expected response format is JSON Laravel returns a JSON object with 
 }
 ```
 
-## Rendering other exceptions
+### 渲染其他异常
 
-At this point all the special exceptions are either converted to a simple HTTPException or rendered using a special way, as for the rest of exceptions laravel first checks if the expected response format is HTML or JSON and then acts accordingly:
+在这一点上，所有特殊的异常都被转换成一个简单的 HTTPException 或者用一种特殊的方法来渲染，而其他的异常，Laravel 会先检查事先决定的响应格式是 HTML 还是 JSON，然后相应地执行：
 
-### How does laravel detects the expected response format?
+#### Laravel 如何检测事先决定的响应格式？
 
-Laravel uses the `expectsJson()` method inside `Illuminate\Http\Request`, this methods checks if a `X-Requested-With` header is present and holds a `XMLHttpRequest` value, this header is set by most JavaScript frameworks and laravel uses it to assume that the request is an Ajax request, however Laravel also checks for a `X-PJAX` header on the request and just returns false if it's present since that indicates that the response should not be in JSON format but rather a regular HTML response.
+Laravel 使用 `Illuminate\Http\Request` 中的 `expectsJson()` 方法，这个方法检查 `X-Requested-With` 头是否存在，如果存在就保存  `XMLHttpRequest`  的值，这个头部是由大多数 JavaScript 框架设置。Laravel 使用它来假定请求是一个 Ajax 请求，但是 Laravel 还会根据请求检查 `X-PJAX` 头，如果存在，则返回 false。因为这表示响应不应该是 JSON 格式，而是一个常规的 HTML 响应。
 
-Finally it looks into the `Accept` header and see if the content of the header implies that it expects JSON in the response.
+最后它会查看 `Accept` 头，看看头文件的内容是否暗示它希望在响应中得到 JSON。
 
-### So if the response expects JSON how does laravel convert the exception to JSON?
+#### 那么如果是希望响应 JSON那又是如何将异常转换为 JSON 呢？
 
-In case the `app.debug` configuration is set to true laravel converts the exception to a JSON format with the following structure:
+如果将 `app.debug` 配置设置为 true，Laravel 会将该异常转换为具有以下结构的 JSON 格式：
 
 ```json
 {
@@ -81,7 +81,7 @@ In case the `app.debug` configuration is set to true laravel converts the except
 }
 ```
 
-This helps a lot while working in a development environment in that it gives the developer insights about what went wrong while the request was being handled, but of course the `app.debug` options shouldn't be set to true in a production server since it may expose sensitive information, in that case laravel checks if the exception is an HTTPException and returns the exception message a JSON structure:
+这对开发环境中工作很有帮助，因为它使开发人员了解处理请求时发生了什么问题。但是当然，在生产服务器中应该不应该将 `app.debug` 的选项设置为 true，因为它可能会暴露敏感信息。在这种情况下，laravel 会检查异常是否是 HTTPException，并返回 JSON 结构发的异常消息：
 
 ```json
 {
@@ -89,7 +89,7 @@ This helps a lot while working in a development environment in that it gives the
 }
 ```
 
-However, if the exception is not an HTTP Exception, 500, Laravel just responds with a "Server Error" message:
+然而，如果异常不是 HTTP 异常，500，Laravel 只会响应一个「服务器错误」的消息：
 
 ```json
 {
@@ -97,10 +97,12 @@ However, if the exception is not an HTTP Exception, 500, Laravel just responds w
 }
 ```
 
-> If you're fine with displaying the exception message to people consuming your API then throw an HTTP Exception, otherwise laravel will protect your data by hiding the actual exception message and only show "Server Error".
+> 如果您向使用 API 的用户显示异常消息，则抛出 HTTP 异常，否则 Laravel 将通过隐藏实际异常消息并仅显示「服务器错误」来保护你的数据。
 
-### What happens when an HTML response is expected?
 
-First laravel checks if you have any views inside your `resources/views/errors` directory with the name of the response status code, for example `500.blade.php`, if so Laravel renders that view and presents it to the end user.
 
-If no view was found Laravel will use Symfony's exception handler to display a nice view with information about the exception in case `app.debug` is on, if it's not then a "Whoops, looks like something went wrong." will appear to the end user.
+#### 当事先约定的 HTML 响应时会发生什么？
+
+首先 Laravel 会检查 `resources/views/errors` 目录中是否有包含响应状态代码名称的任何视图，例如 `500.blade.php`。如果有，Laravel 会渲染该视图并将其呈现给最终用户。
+
+如果没有视图，Laravel 会使用 Symfony 的异常处理程序来显示一个友好的视图。而且如果 `app.debug` 被打开了，那这个视图还会包含有关异常的信息。但如果没有，最终出现在用户面前的会是「Whoops, looks like something went wrong.」这句话。
