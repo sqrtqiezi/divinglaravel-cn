@@ -18,7 +18,7 @@ return $response;
 
 正如你看到的，在应用程序中所有未处理的异常都在这里被捕获，接着 Laravel 会执行两个任务：
 
-1. 根据配置向相应的 Kernel 汇报异常。
+1. 根据配置向相应的渠道汇报异常。
 2. 将异常实例转换为可显示的格式，再输出呈现给最终用户。
 
 >两个内核可以从 HTTP 内核的 “app\Http\Kernel.php” 和控制台内核的 “app\Console\Kernel.php” 访问。 这两个类都扩展了它们各自在 Illuminate 中的 Kernel 基类，深入了解它们是怎么工作是一件非常有趣的事情。
