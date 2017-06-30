@@ -118,7 +118,7 @@ To build the command, the following configurations need to be known:
 
 A mutex is a unique ID set for every command, Laravel uses it mainly to prevent command overlapping which we will discuss later, but it also uses it as a unique ID for the command.
 
-mutex 是每个命令的唯一 ID 集，Laravel 主要使用它来防止重复命令（我们稍后再讨论这个）同时 mutex 也使用它作为命令的唯一 ID。
+mutex 是每个命令的唯一 ID 集，Laravel 主要使用它来防止重叠命令（我们稍后再讨论这个）同时 mutex 也使用它作为命令的唯一 ID。
 
 Laravel defines the mutex of each command inside the `Event::mutexName()` method:
 
