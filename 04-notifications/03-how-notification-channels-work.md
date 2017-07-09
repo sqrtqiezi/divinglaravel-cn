@@ -1,8 +1,10 @@
-# How Notification Channels Work
+# 通知渠道如何工作
 
-As we discussed earlier, the `Notifications\NotificationSender@sendToNotifiable()` uses the `Notifications\ChannelManager@driver()` method to create a driver based on the channel the notification should be sent through.
+正如我们前面讨论的那样, `Notifications\NotificationSender@sendToNotifiable()` 基于通知应该使用的发送渠道的 `Notifications\ChannelManager@driver()` 方法创建驱动程序。
 
 The `ChannelManager` extends the `Support\Manager` class which Laravel uses as a factory class in many situations, the `driver()` method has the following:
+
+`ChannelManager` 继承了 Laravel 在很多情况下使用的工厂类的 `Support\Manager` 类，`driver()` 方法像这样：
 
 ```php
 if (! isset($this->drivers[$driver])) {
@@ -12,7 +14,7 @@ if (! isset($this->drivers[$driver])) {
 return $this->drivers[$driver];
 ```
 
-The `create()` driver method uses the channel name passed and looks for a method in the ChannelManager class that creates the channel:
+`create()` 驱动方法使用传递渠道名并创建在 ChannelManager 类中查找的方法：
 
 ```php
 $method = 'create'.Str::studly($driver).'Driver';
@@ -22,19 +24,19 @@ if (method_exists($this, $method)) {
 }
 ```
 
-So for example if we want to use the slack channel, the manager will be looking for a `createSlackDriver()` method.
+所以如果我们要使用 slack 渠道，那么管理器会寻找一个 `createSlackDriver()` 方法。
 
-Currently there are 5 built in notification channels:
+目前有 5 个内置通知渠道：
 
-* Database
-* Broadcast
-* Nexmo SMS
+* 数据库
+* 广播
+* Nexmo 短信
 * Slack
-* Mail
+* 邮件
 
-### Then how does laravel load custom channels?
+#### 那 Laravel 如何加载自定义渠道？
 
-To pass a custom notification channel you use the channel class name, inside the `ChannelManager` laravel overrides the createDriver() method like this:
+要传递自定义通知渠道，可以使用渠道类名称，在 `ChannelManager` 中，Laravel 会像这样覆盖 `createDriver()` 方法：
 
 ```php
 try {
@@ -48,11 +50,11 @@ try {
 }
 ```
 
-So in case Laravel couldn't load a driver with the given channel name it'll assume you're trying to load a custom notification channel by its class name, and it uses the container to build an instance of the given class.
+因此，如果 Laravel 无法加载具有给定渠道名称的驱动，则会假设你正尝试通过其类名加载自定义通知渠道，并使用容器来构建给定类的实例。
 
-## The Database Notification Channel
+## 数据库通知渠道
 
-To send a notification, Laravel calls the `send()` method on that channel, here's how that method looks like in the Database channel:
+要发送通知，Laravel 会在该渠道上调用 `send()` 方法，以下是数据库渠道中的方法：
 
 ```php
 public function send($notifiable, Notification $notification)
@@ -66,7 +68,7 @@ public function send($notifiable, Notification $notification)
 }
 ```
 
-The `routeNotificationFor()` method exists in the `Notifications\RoutesNotifications` trait, this trait is used inside the `Notifications\Notifiable` trait that a User model uses by default in a fresh laravel installation, this method is used to determine where to route the notification to, here's how this method looks like:
+`routeNotificationFor()` 存在于 `Notifications\RoutesNotifications` trait 中，这个 trait 用于默认情况下 Laravel 安装中使用的 `Notifications\Notifiable` trait。这个方法用于决定路由到哪去，以下是该方法的内容：
 
 ```php
 public function routeNotificationFor($driver)
@@ -86,13 +88,15 @@ public function routeNotificationFor($driver)
 }
 ```
 
-So it looks for a `routeNotificationFor{DriverName}` method in the notifiable class, and uses the output of such method as the route.
+所以它在通知类中寻找一个 `routeNotificationFor{DriverName}` 方法，并使用这种方法的输出作为路由。
 
 However, for the `mail` driver it uses the `mail` attribute of the notifiable, for the `nexmo` driver it uses the `phone_number` attribute, and for the `database` driver it uses the `notifications()` relationship method by default.
 
-### Where's that method coming from?
+而对于 `mail` 驱动，它使用通知的 `mail` 属性。对于 `nexmo` 驱动，它使用 `phone_number` 属性。对于 `database` 驱动，它默认使用 `notifications()` 关系方法。
 
-The `Notifiable` trait uses the `Notifications\HasDatabaseNotifications` trait which holds the relationship definition between the notifiable model and the DatabaseNotification built-in model.
+#### 那个方法来自哪里？
+
+`Notifiable` trait 使用  `Notifications\HasDatabaseNotifications` trait，这个 trait 保存了 notifiable 模型和 DatabaseNotification 内置模型之间的关系定义。
 
 ```php
 public function notifications()
@@ -102,9 +106,9 @@ public function notifications()
 }
 ```
 
-### Back to the send method:
+#### 回到发送方法
 
-What the send method does is that it creates a new database row in the notifications table, it uses a `getData()` internal method to get the content of the notification that will be decoded into JSON before storing it in the database:
+send 方法的作用是在通知表中创建一个新的数据库行，它使用一个 `getData()` 内部方法来获取将被解码成 JSON 的通知的内容，然后将其存储在数据库中：
 
 ```php
 if (method_exists($notification, 'toDatabase')) {
@@ -121,13 +125,13 @@ throw new RuntimeException(
 );
 ```
 
-So it looks for a `toDatabase` or a `toArray` method on the the Notification class and uses the output as the notification data.
+因此，它在 Notification 类上查找 `toDatabase` 或 `toArray` 方法，并将该输出用作通知数据。
 
-## The broadcasting notification channel
+## 广播通知渠道
 
-Similar to the database channel, it uses a `getData` internal method to get the data of the notification from a `toBroadcast` method or a `toArray` method, however you can return a `Notifications\Messages\BroadcastMessage` from within your `toBroadcast` method, this class implements the `Queueable` trait that you can use to configure how the broadcasted event will be queued.
+类似于数据库通道，它使用 `getData` 内部方法从 `toBroadcast` 方法或 `toArray` 方法获取通知的数据，但是你可以从你的 `toBroadcast` 方法中返回 `Notifications\Messages\BroadcastMessage`。此类实现了可以使用 `Queueable` trait 来配置如何将广播事件放进队列。
 
-Here's how the `send` method looks like:
+ `send` 方法如下所示：
 
 ```php
 $message = $this->getData($notifiable, $notification);
@@ -144,13 +148,13 @@ if ($message instanceof BroadcastMessage) {
 return $this->events->dispatch($event);
 ```
 
-So it creates a `BroadcastNotificationCreated` event, and dispatches it using Laravel's Event Dispatcher, as you can see if you return an instance of `BroadcastMessage` you can configure the `queue` and the `connection` of the queued event.
+所以它创建一个 `BroadcastNotificationCreated` 事件，并使用 Laravel的 事件调度进行分配，你可以看到，如果你返回一个  `BroadcastMessage` 实例，你可以配置 `queue` 和队列事件的 `connection`。
 
-## The Nexmo SMS notification channel
+## Nexmo 短信通知渠道
 
-This channel uses `\Nexmo\Client` to send a message using the configuration returned from the `toNexmo()` method of your notification class, in this method you can return a string or an instance of `Notifications\Messages\NexmoMessage`.
+这个渠道使用 `\Nexmo\Client` 从你通知类的 `toNexmo()` 方法返回发送消息的配置，在这种方法中，可以返回一个字符串或 `Notifications\Messages\NexmoMessage` 的实例。
 
-If a string was returned it will be used as the SMS body, but you can use the `NexmoMessage` class to have more control over the message:
+如果返回一个字符串，它将被用作 SMS 主体，但可以使用  `NexmoMessage` 类来更好地控制消息：
 
 ```php
 if (! $to = $notifiable->routeNotificationFor('nexmo')) {
@@ -171,11 +175,11 @@ return $this->nexmo->message()->send([
 ]);
 ```
 
-> While creating the NexmoChannel instance inside ChannelManager::createNexmoDriver, Laravel uses configs in your `services.nexmo` configuration keys to define the key/secret of your Nexmo account as well as the default from address.
+> 在 ChannelManager::createNexmoDriver 内创建 NexmoChannel 实例时，Laravel 使用你的 `services.nexmo` 配置键中的配置来定义 Nexmo 帐户的密钥/密码以及默认地址。
 
-## Slack notification channel
+## Slack 通知渠道
 
-This channel uses Guzzle to communicate with the Slack message webhook, taking a look at `SlackWebhookChannel::send`:
+该渠道使用 Guzzle 与 Slack webhook 消息通信，看看 `SlackWebhookChannel::send`：
 
 ```php
 if (! $url = $notifiable->routeNotificationFor('slack')) {
@@ -187,11 +191,11 @@ $this->http->post($url, $this->buildJsonPayload(
 ));
 ```
 
-The `buildJsonPayload` takes care of formatting the output of `toSlack` to a valid webhook payload.
+`buildJsonPayload` 负责将 `toSlack` 的输出格式化为有效的 Webhook 负载。
 
-## Mail notification channel
+## 邮件通知渠道
 
-Using the mail notification channel you can build your mail message using a `Mail\Mailable` instance or a `Notifications\Messages\MailMessage`, in your `toMail()` method you can return an instance of `Mailable` and in that case the `MailChannel` will only call `send()` on that instance:
+使用邮件通知渠道，可以使用 `Mail\Mailable` 实例或 `Notifications\Messages\MailMessage` 构建邮件消息，在 `toMail()` 方法中，可以返回一个 `Mailable` 的实例，在这种情况下， `MailChannel` 只会调用该实例的 `send()`：
 
 ```php
 $message = $notification->toMail($notifiable);
@@ -201,7 +205,7 @@ if ($message instanceof Mailable) {
 }
 ```
 
-On the other hand if you decided to use the Notification System's `MailMessage` the `MailChannel` will use Laravel's `Mail\Mailer` to send the message:
+另一方面，如果决定使用通知系统 `MailMessage`， `MailChannel` 会使用 Laravel 的  `Mail\Mailer`  发送消息：
 
 ```php
 $this->mailer->send($this->buildView($message), $message->data(), function ($mailMessage) use ($notifiable, $notification, $message) {
@@ -209,7 +213,7 @@ $this->mailer->send($this->buildView($message), $message->data(), function ($mai
 });
 ```
 
-By default Laravel uses a default markdown view `notifications::email` to create HTML & Text versions of your message, this allows you to build a simple mail message using PHP only, you can find this markdown view at `Notifications/resources/views/email.blade.php`, it renders the properties of your `MailMessage` instance to build the content of the email:
+默认情况下，Laravel 使用默认的 markdown 视图 `notifications::email` 来创建消息的 HTML 和 Text 版本，这允许你只使用 PHP 构建简单的邮件消息，你可以在 `Notifications/resources/views/email.blade.php` 找到这个 markdown 视图，它会渲染 `MailMessage` 实例的属性来构建电子邮件的内容：
 
 ```php
 @foreach ($introLines as $line)
@@ -218,6 +222,6 @@ By default Laravel uses a default markdown view `notifications::email` to create
 @endforeach
 ```
 
-The `MailMessage` class extends the `SimpleMessage` class that contains a `line()` method, this method fils the `introLines` array with paragraphs you want to show in your mail message, this array is used in the portion of `email.blade.php` shared above to display these paragraphs in your actual email message.
+`MailMessage` 类继承了包含一个 `line()` 方法的 `SimpleMessage` 类，此方法使用要在邮件消息中显示的段落来提交 `introLines` 数组，这个数组用于上面的 `email.blade.php` 部分，以便在实际电子邮件中显示这些段落。
 
-If you take a look at the [official documentation](https://laravel.com/docs/5.4/notifications#mail-notifications) you can find all the configurations you might need to send a mail message, you can also take a look at the `Notifications\Channels\MailChannel` to know how the mail message is built in more detail since we won't discuss mail sending in this dive.
+如果查看 [官方文档](https://laravel.com/docs/5.4/notifications#mail-notifications)，可以找到可能需要发送邮件的所有配置。你还可以查看 `Notifications\Channels\MailChannel` 了解邮件内容的详细信息，因为我们不会在此这里中讨论邮件发送。
