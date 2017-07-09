@@ -1,25 +1,25 @@
-# Sending Notifications To Queue
+# 用队列发送通知
 
-The simplest way for laravel to queue notifications is to create a single job that sends all the notifications to all the notifiers, but in case one notification failed this would cause the whole Job to be reported as failed even if some notifications were actually sent, and retrying the job would mean that notifications that were already sent successfully will be re-sent again.
+Laravel 用队列通知最简单的方法是创建一个任务将所有通知发送出去，但是如果其中有一个通知发送失败，就会报告任务失败了，即使实际上有些通知发送成功了，而重新执行该任务时会将已经发送成功的通知再发送一遍。
 
-To prevent this Laravel creates a queued job for every single notifiable and channel, for example let's say we want to notify 10 customers that the Privacy Policy was updated, and we need to send them an email as well as an SMS message, for that laravel is going to create 20 jobs that sends the notification to 10 clients through 2 different channels.
+为了防止这种情况发生，Laravel 为每个单独的通知和渠道创建了一个队列任务。比方说我们要通知 10 个客户更新隐私政策，向他们发送电子邮件以及短信，因此 Laravel 会创建 20 个任务，即通过两个不同的渠道将通知分别发送到 10 个客户端中去。
 
-Laravel also assigns a unique ID for the notification per notifiable, it uses [ramsey/uuid](https://github.com/ramsey/uuid), this unique ID is used when we use the Database channel as the primary key for the notification record, or for when we broadcast the notification.
+Laravel 还为每个通知的客户端用 [ramsey/uuid](https://github.com/ramsey/uuid) 分配唯一 的 ID，这个唯一的 ID 用来当我们使用数据库通道或者用广播通知时作为通知记录的主键。
 
-Long Story short:
+也就是说：
 
-* Laravel dispatches a notification to the queue once per channel per notifiable
-* Laravel assigns a unique ID to the notification object per notifiable
+* Laravel 为每个渠道的每个通知分配一个通知队列
+* Laravel 为每个通知的通知对象分配一个唯一的 ID
 
-Inside the `Illuminate\Notifications\NotificationSender` the `queueNotification()` method is called if the notification should be queued, and inside that method laravel dispatches an instance of `Illuminate\Notifications\SendQueuedNotifications` to the queue, this instance is the actual job the worker runs and it holds a reference to the notifiable, notification, channel, and some information about how the notification should be queued which includes:
+如果把通知丢队列，就调用  `Illuminate\Notifications\NotificationSender` 中的  `queueNotification()` 方法，这个实例是开发者实际运行的任务，它提及了被通知者、通知的内容、渠道跟一些有关通知如何排队的信息，其中包括：
 
-* The queue connection to be used
-* The queue to be used
-* Any delay that should be applied before sending
+- 要使用的队列连接
+- 要使用的队列
+- 发送前应适用的延迟
 
-### How can I define these values?
+#### 如何定义这些值？
 
-You can set these values as public properties inside the Notification class:
+你可以将这些值设置为 Notification 类中的公共属性：
 
 ```php
 class PolicyUpdateNotification extends Notification implements ShouldQueue
@@ -32,7 +32,7 @@ class PolicyUpdateNotification extends Notification implements ShouldQueue
 }
 ```
 
-Or you can use the methods of the `Illuminate\Bus\Queueable` trait if you use that trait inside your notification.
+或者如果你在通知中使用 trait，你可以使用 `Illuminate\Bus\Queueable`  trait 的方法。
 
 ```php
 Notification::send($users, 
@@ -40,11 +40,11 @@ Notification::send($users,
 );
 ```
 
-### What happens inside the SendQueuedNotifications job?
+#### 在 SendQueuedNotifications 任务中发生了什么？
 
-What happens inside the dispatched job is fairly simple, it calls the `sendNow()` method of the notification manager which sends the notification right away.
+分配任务中发生的事情相当简单，它调用了通知管理器中 `sendNow()` 方法来立即发送通知。
 
-It also does some queue-related housekeeping that we won't be looking into in this dive.
+它也做了一些队列相关的家务，但不在这里深入。
 
 
-[View a chart of the entire process](https://divinglaravel.com/graph/notifications-sequence)
+[查看整个过程的图表](https://divinglaravel.com/graph/notifications-sequence)
