@@ -1,6 +1,6 @@
-# Before The Dive
+# 写在前面
 
-Laravel is shipped with a Notifications system that makes it super easy to send notifications to your users through different notification channels, here's what a notification object might look like:
+Laravel 自带通知系统，可以让你超级方便地通过不同的渠道向你的用户发送提醒，一个通知对象看起来就像这样：
 
 ```php
 class TestNotification extends Notification
@@ -20,46 +20,48 @@ class TestNotification extends Notification
 }
 ```
 
-The `via()` method is used to set the channels Laravel should send the notification through, and you can define multiple methods to customize how the notification should be sent in each channel.
+`via()` 方法用于设置指示 Laravel 使用的发送通知的渠道，而且你也可以定义多种方法来自定义每个渠道该如何发送通知。
 
 It all starts in `Illuminate\Notifications\ChannelManager` which implements two interfaces:
+
+所有的一切都在 `Illuminate\Notifications\ChannelManager`  中开始的，它实现了两个接口：
 
 * `Illuminate\Contracts\Notifications\Dispatcher`
 * `Illuminate\Contracts\Notifications\Factory`
 
-You can send notifications using the `Illuminate\Support\Facades\Notification` facade which uses the `ChannelManager` internally:
+你可以内部使用 `ChannelManager` 的 `Illuminate\Support\Facades\Notification` facade 来发送通知：
 
 ```php
 Notification::send($users, new TestNotification());
 ```
 
-The `send()` method accepts a single notifiable or an array of notifiables, inside that method Laravel creates an instance of `Illuminate\Notifications\NotificationSender` which handles the actual action of sending the notification, it has three main tasks:
+`send()` 方法接受单个或者多个通知。在这个方法中，Laravel 创建了一个 `Illuminate\Notifications\NotificationSender` 实例来处理发送通知的实际操作，主要有三个步骤：
 
-* Prepares the list of notifiables
-* Decides if the notification should be queued or sent right away
-* Handles the sending/queueying process
+* 准备通知列表
+* 确认是否应立即加入队列或直接发送通知
+* 处理发送/队列进程
 
-The first task is pretty simple, it just formats the given `$notifiables` value into an array of a Collection, that insures the value of notifiables is iteratable for later use.
+第一个任务很简单，它只是将给定的 `$notifiables` 值格式化成一个 Collection 数组，这样可以确保数组的值可以迭代方便以后使用。
 
-The second task is simple as well, it checks if the Notification we're passing implements the `Illuminate\Contracts\Queue\ShouldQueue` interface, if so then it means that Notification should be dispatched to queue instead of sending right away.
+第二个任务也很简单，它检查我们传递的通知是否实现了 `Illuminate\Contracts\Queue\ShouldQueue`  接口，如果是，那么这意味着通知应该被发送到队列而不是立即发送。
 
-The third task is where the actual work happens, let's first discover the scenario where a Notification should be queued.
+第三个任务是实际工作发生的地方，我们首先发现通知加入队列的场景。
 
-## Sending Notifications right away
+## 立即发送通知
 
-If the notification should be sent right away the Channel Manager calls the `sendNow()` method of the `NotificationSender`, this method does the following:
+如果通知应立即发送，则 Channel Manager 将调用  `NotificationSender` 的 `sendNow()` 方法，该方法执行以下操作：
 
-1. Makes sure a notification ID is set
-2. Send the notification instance to the different notification drivers/channels
-3. Fire a couple of events
+1. 确保设置了通知 ID
+2. 将通知实例发送到不同的通知驱动/通道
+3. 触发几个事件
 
-First, Laravel fires the `Illuminate\Notifications\Events\NotificationSending`, if any of the listeners to that event returned `false` the notification won't be sent, you can use that to do any final checks.
+首先，Laravel 触发 `Illuminate\Notifications\Events\NotificationSending`，如果该事件的监听器返回 `false` ，则不会发送通知，可以使用这个方法进行最终检查。
 
-And after the sending process a `Illuminate\Notifications\Events\NotificationSent` event is fired which you can use to do any logging or housekeeping.
+发送之后，`Illuminate\Notifications\Events\NotificationSent` 事件被触发，可以使用它来进行日志记录或清理。
 
-To send the notification, the sender calls the `build()` factory method on the channel manager to build an instance of the channel that should be used and then calls the `send()` method on that channel.
+要发送通知，发送方在渠道管理器上调用 `build()` 工厂方法，以构建应该使用的渠道的实例，然后在该渠道上调用 `send()` 方法。
 
-Also I'd like to mention that if you take a look at the `sendNow()` method you'll find that it accepts a third parameter which is the channels that should be used to send the notification, you can use this to simply override the channels specified in the notification class itself, you can actually call `sendNow()` instead of `send()` to make laravel send the notification right away even if the notification class implements the shouldQueue interface:
+另外我想提一下，如果你看一下 `sendNow()` 方法，你会发现它接受第三个参数，它是应该用来指定通知的渠道，可以使用它来简单地覆盖通知类本身指定的通道，实际上即使通知类实现了 shouldQueue 接口，也可以调用 `sendNow()` 来代替 `send()` 使 Laravel 立即发送通知：
 
 ```php
 Notification::sendNow($users, new TestNotification(), ['slack', 'mail']);
