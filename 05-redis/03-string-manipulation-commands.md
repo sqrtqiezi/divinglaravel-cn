@@ -1,61 +1,61 @@
-# String Manipulation Commands
+# 字符串操作命令
 
-Imagine we want to keep track of a certain product sales per hour, we could schedule a cron job that runs every hour and does the following:
+想像一下，我们想跟踪每小时的某一产品销售，我们可以安排一个每小时运行一次的 cron 作业，并执行以下操作：
 
 ```php
 set("product:1:sales:{$currentHour}", $sales)
 ```
 
-And then to plot the results later we can use `mget` to retrieve the value of all these keys:
+然后为了绘制结果，我们可以使用 `mget` 来检索所有这些 key 的值：
 
 ```php
 mget('product:1:sales:00', 'product:1:sales:01', ...)
 ```
 
-And maybe at the beginning of the new day we reset all the keys:
+也许我们需要在新的一天的开始时重置所有的 key：
 
 ```php
 del('product:1:sales:00', 'product:1:sales:01', ...)
 ```
 
-Ok that might work, but let me show you another way to do it using Redis string manipulation commands:
+这也是一种方法，但让我告诉你另一种使用 Redis 字符串操作命令的方式：
 
 ```php
 append("product:1:sales", '00030')
 expire("product:1:sales", 86400)
 ```
 
-Here we'll append the 5-digit sales number every hour to a `product:1:sales` string key, the value of that key after a few hours may look like:
+在这里，我们将每小时将 5 位数的销售数字追加到 `product:1:sales`  字符串 key 中，几个小时后这个 key 的值可能如下所示：
 
 ```
 000300020000010
 ```
 
-We also set they key to `expire` after 24 hours automatically using the expire command.
+我们还设置 key 在 24 小时后自动使用 `expire` 命令。
 
-Now since we know that our sales value is always a 5-digit number, we can use the following Redis commands to gather some useful information:
+现在，由于知道销售值是一个 5 位的数字，所以可以使用以下 Redis 命令来收集一些有用的信息：
 
 ```php
-// strlen returns the length of the string
+// strlen 返回字符串的长度
 
 $hoursElapsed = Redis::strlen("product:1:sales") / 5;
 ```
 
-We can also get the sales in the first 2 hours of the day:
+也可以在一天的头两个小时获得销售额：
 
 ```php
-// getrange returns the portion of the string specified by the given offset start and end.
-// and str_split will divide the string returned every five characters
+// getrange 返回由给定的偏移开始和结束指定的字符串的部分。
+// str_split 将分隔每五个字符返回的字符串
 
 $salesUntil2AM = str_split(
     Redis::getrange("product:1:sales", 0, (5 * 2) - 1),
     5
 );
 
-// The result will be ['00030', '00200']
+// 返回结果会是 ['00030', '00200']
 ```
 
-Or the sales for the whole day:
+或全天的销售：
 
 ```php
 $sales = str_split(
@@ -64,11 +64,9 @@ $sales = str_split(
 );
 ```
 
-We can also reset the sales at a given hour:
+也可以在给定时间重置销售额：
 
 ```php
-// Here we reset the sales of the second hour, so starting at offset 5 we'll
-// overwrite the string for the length of the passed value.
-
+// 这里我们重置第二个小时的销售，所以从偏移量 5 开始我们会覆盖传递值的长度的字符串。
 Redis::setrange("product:1:sales", 5, '00300');
 ```
