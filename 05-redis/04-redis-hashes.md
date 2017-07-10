@@ -1,135 +1,137 @@
-# Redis Hashes
+# Redis 哈希
 
-While recording the product sales of a multi-tenant application, we need a way to store the metrics in a way that guarantees a solid separation between each tenant, one idea is to use key names like `shop:{shopId}:product:{productId}:sales` that way we'll have a key per product for each shop, since product IDs might co-exist in multiple shops, we can increment the values of each key on every purchase and get that value when needed, if we need the sales for the whole business we can do something like:
+在记录多用户应用程序的产品销售时，我们需要一种方式来存储指标，以确保每个用户之间的牢固分离。一个方法是使用 key，如 `shop:{shopId}:product:{productId}:sales` ，每个商店的每个产品一个 key。由于产品 ID 可能在多个商店中共存，因此我们可以在每次购买时增加每个 key 的值，并在需要时获取它。如果我们需要整个业务的销售，我们可以执行以下操作：
 
 ```php
 Redis::mget("shop:{$shopId}:product:1", "shop:{$shopId}:product:2", ...);
 ```
 
-This will bring the sales of every product inside a given business.
+这将使每个产品的销售在一个给定的业务内。
 
-### That sounds cool, but seems like you'll introduce a better approach?
+#### 这听起来很酷，但似乎还有更好的方法？
 
-I've been reading [this post](https://engineering.instagram.com/storing-hundreds-of-millions-of-simple-key-value-pairs-in-redis-1091ae80f74c?gi=36305aaa4ef0) from the Instagram Engineering blog and I was amazed about the performance gain they described from using Redis Hashes over regular strings, let me share some of the numbers:
+我从 Instagram Engineering 的博客那里读了 [这篇文章](https://engineering.instagram.com/storing-hundreds-of-millions-of-simple-key-value-pairs-in-redis-1091ae80f74c)，我对使用 Redis Hash 的常规字符串描述的性能提升感到惊讶，让我分享一些数字：
 
-* Having 1 Million string keys needed about 70MB of memory
-* Having 1000 Hashes each with 1000 Keys only needed 17MB!
+* 拥有 1 百万个字符串 key 需要大约 70MB 的内存
+* 1000 个哈希每 1000 个 key 只需要17MB！
 
-The reason behind that is that hashes can be encoded efficiently in a very small memory space, so Redis makers recommend that we use hashes whenever possible since "a few keys use a lot more memory than a single key containing a hash with a few fields", a key represents a Redis Object holds a lot more information than just its value, on the other hand a hash field only hold the value assigned, thus why it's much more efficient.
+背后的原因是可以在非常小的内存空间中有效地编码散列，所以 Redis 的制造者建议我们尽可能使用哈希值，因为「几个 key 比包含几个字段的哈希的单个 key 使用更多的内存」。一个 key 代表一个 Redis 对象比它的值拥有更多的信息。另一方面，散列字段只保留分配的值，这也是为什么它更有效率。
 
-## Let's build our hash
+## 构建哈希
 
 ```php
 Redis::hmset("shop:{$shopId}:sales", "product:1", 100, "products:2", 400);
 ```
 
-This will build a Redis hash with two fields `product:1` and `products:2` holding the values `100` and `400`.
+这将构建一个 Redis 哈希，其中包含两个字段 `product:1` 和 `products:2`，保存值为 `100` 和 `400`。
 
-The command `hmset` gives us the ability to set multiple fields of a hash in one go, there's a `hset` command that we can use to set a single field though.
+命令 `hmset` 使我们能够一次性设置哈希的多个字段，不过可以使用 `hset` 命令来设置单个字段。
 
-We can read the values of hash fields using the following:
+我们可以使用以下内容读取哈希字段的值：
 
 ```php
 Redis::hget("shop:{$shopId}:sales", 'product:1');
-// To return a single value
+// 返回单个值
 
 Redis::hmget("shop:{$shopId}:sales", 'product:1', 'product:2');
-// To return values from multiple keys
+// 从多个 key 返回值
 
 Redis::hvals("shop:{$shopId}:sales");
-// To return values of all fields
+// 返回所有字段的值
 
 Redis::hgetall("shop:{$shopId}:sales");
-// Also returns values of all fields
+// 也返回所有字段的值
 ```
 
-In case of `hmget` and `hvals` the return value is an array of values [100, 400], however in case of hgetall the return value is an array of keys & values:
+如果是用 `hmget` 和 `hvals`，返回值是数组值 [100,400]，但是如果是 `hgetall`，返回值是关联数组：
 
 ```php
 ["product:1", 100, "product:2", 400]
 ```
 
-### Much organized than having multiple keys
+#### Much organized than having multiple keys
 
-Yes and you also stop polluting the key namespace with lots of complex-named keys.
+是的，你可以停止用复杂的命名方式污染 key 的命名空间。
 
-With all the above mentioned benefits there are also a number of useful operations you can do on a hash key:
+利用上述所有优点，还可以在哈希 key 上执行一些有用的操作：
 
-### Incrementing & Decrementing
+### 递增 & 递减
 
 ```php
 Redis:hincrby("shop:{$shopId}:sales", "product:1", 18);
-// To increment the sales of product one by 18
+// 将产品的销售量增加到 18
 
 Redis:hincrbyfloat("shop:{$shopId}:sales", "product:1", 18.9);
-// To increment the sales of product one by 18.9
+// 将产品的销售额增加 18.9
 ```
 
-To decrement you just need to provide a negative value, there's no decrby command for hash fields.
+你只需要提供一个负值来做递减，哈希字段没有什么 decrby 命令。
 
-### Field Existence
+### 字段存在
 
-Like string fields you can check if a hash key exists:
+像字符串字段一样，也可以检查哈希 key 是否存在：
 
 ```php
 Redis::hexists("shop:{$shopId}:sales", "product:1");
 ```
 
-You can also make sure you don't override an existing field when that's not the desired behaviour:
+也可以确保不覆盖现有字段，但这不是必须的行为：
 
 ```php
 Redis::hsetnx("shop:{$shopId}:sales", "product:1");
 ```
 
-This will make sure the field doesn't exist before overriding it.
+这将确保该字段在覆盖之前不存在。
 
-### Other operations
+### 其他操作
 ```php
 Redis::hdel("shop:{$shopId}:sales", "product:1", "product:2");
 ```
 
-This command deletes the given fields from the hash.
+这个命令删除哈希中给定的字段。
 
 ```php
 Redis::hstrlen("shop:{$shopId}:sales", "product:1");
 ```
 
-This command returns the string length of the value stored at the given field.
+这个命令返回存储在给定字段中的值的字符串长度。
 
-## Performance comes with a cost
+## 性能带来成本
 
-As we mentioned before, a hash with a few fields is much more efficient than storing a few keys, a key stores a complete Redis object that contains information about the value stored as well as expiration time, idle time, information about the object reference count, and the type of encoding used internally.
+正如我们之前提到的，具有几个字段的哈希比存储几个 key 更有效率。一个 key 存储一个完整的 Redis 对象，其中包含的信息有关存储值、到期时间、空闲时间、关于对象引用计数的信息，以及内部使用的编码类型。
 
-Technically if we create 1 key (Redis Object) that contains multiple string fields it'll require much less memory since every field holds nothing but a reference to the value it holds, and in hashes with small number of fields it's even encoded into a length-prefixed string in a format like:
+从技术上讲，如果我们创建一个包含多个字符串字段的 key（Redis Object），它将需要更少的内存，因为每个字段只保留对它所持有的值的引用。并且在具有少量字段的哈希中，它甚至被编码成一个长度为前缀的字符串，格式如下：
 
 ```php
 hashValue = [6]field1[4]val1[6]field2[4]val2
 ```
 
-Since a hash field holds only a string value we can't associate an expiration time for it, the makers of Redis suggest that we store an individual field to hold the expiration time for each field if need be and get both fields together to compare if the field is still alive:
+由于哈希字段只保留一个字符串值，所以我们无法关联它的到期时间。Redis 的制造者们建议我们存储一个单独的字段来保存每个字段的到期时间，如果需要的话，将两个字段一起进行比较（如果该字段仍然存在）。
 
 ```php
 Redis::hmset('hashKey', 'field1', 'field1_value', 'field1_expiration', '1495786559');
 ```
 
-So whenever we want to use that key we need to bring the expiration value as well and do the extra work ourselves:
+所以每当我们想要使用这个 key ，也需要到期值时，要做额外的工作：
 
 ```php
 Redis::hmget('hashKey', 'field1', 'field1_expiration');
 ```
 
-## Some information about encoding hashes
+## 关于编码哈希的一些信息
 
-From the Redis docs:
+Redis 文档：
 
-> Hashes, when smaller than a given number of fields, and up to a maximum field size, are encoded in a very memory efficient way that uses up to 10 times less memory (with 5 time less memory used being the average saving). Since this is a CPU / memory trade off it is possible to tune the maximum number of fields and maximum field size.
+> 当小于给定数量的字段并且最大字段大小时，哈希值以非常高效的方式进行编码，该方式使用最多 10 倍的内存（使用 5 个时间少的内存是平均保存）。由于这是一个 CPU / 内存权衡，因此可以调整最大字段数和最大字段大小。
 
 By default hashes are encoded when they contain less than 512 fields or when the largest values stored in a field is less than 64 in length, but you can adjust these values using the `config` command:
 
+默认情况下，它们包含少于 512 个字段时编码，或者当字段中存储的最大值小于 64 时，可以使用 `config` 命令调整这些值：
+
 ```php
 Redis::config('set', 'hash-max-zipmap-entries', 1000);
-// Sets the maximum number of fields before the hash stops being encoded
+// 设置哈希停止编码之前的最大字段数
 
 Redis::config('set', 'hash-max-zipmap-value', 128);
-// Sets the maximum size of a hash field before the hash stops being encoded
+// 在哈希停止编码之前设置散列字段的最大值
 ```
