@@ -1,10 +1,10 @@
-#Before The Dive
+#写在前面
 
-Laravel Horizon is a queue manager that gives you full control over your queues, it provides means to configure how your jobs are processed, generate analytics, and perform different queue-related tasks from within a nice dashboard.
+Laravel Horizon 是一个队列管理器，让你能完全控制你的队列，它提供了一个漂亮的仪表板来配置任务处理方式、生成分析以及执行不同队列相关任务的方法。
 
-In this dive we're going to learn how Horizon boots up and handles processing jobs using different workers as well as how it collects useful metrics for you to have the full picture of how your application dispatches and runs jobs.
+在这次深入浅出中，我们将了解 Horizon 如何启动并使用不同的 worker 处理执行任务，以及如何收集有用的指标来全面了解应用程序如何分配和运行任务。
 
-It all starts by running `php artisan horizon`, this command scans your `horizon.php`configuration file & starts a number of queue workers based on these configurations:
+这一切都是从运行 `php artisan horizon` 开始的，这个命令扫描你的 `horizon.php` 配置文件，并根据以下配置启动队列的 worker：
 
 ```php
 'production' => [
@@ -18,7 +18,7 @@ It all starts by running `php artisan horizon`, this command scans your `horizon
         timeout=> 60,
         sleep=> 3,
         maxTries=> 0,
-        balance=> "simple", // could be simple, auto, or null
+        balance=> "simple", // 可以是 simple、auto 或者 null
         force=> false,
     ],
     'supervisor-2' => [
@@ -27,39 +27,40 @@ It all starts by running `php artisan horizon`, this command scans your `horizon
 ],
 ```
 
-Here you may define any number of supervisors for each environment, a supervisor is a process living in your system with the purpose of monitoring a number of Queue Workers and make sure they're working as configured, for every supervisor you can set the following:
 
-1. By default a supervisor monitors your `default` queue but you can add any number of queues.
-2. Minimum & Maximum number of Workers allowed to run.
-3. Amount of time to delay failed jobs.
-4. Memory limit of every worker.
-5. Timeout for every worker.
-6. Number of seconds to sleep when no job is available.
-7. Number of times to attempt a job before logging it failed.
-8. The balancing strategy.
-9. Wether your workers should run in maintenance mode or not.
+在这里，你可以为每个环境定义任意数量的「监督者」（ supervisor ）。监督者是用来监控队列中的 worker 的系统进程 并确保它们能按照配置去工作，每个监督者可以设置以下内容：
 
-#### What is a balancing strategy?
+1. 默认情况下，监督者监控你「默认」的那个队列。当然你也可以添加任意数量的队列。
+2. 允许运行的最小和最多的 worker 的数量。
+3. 失败任务延迟执行的时间。
+4. worker 的内存限制。
+5. worker 的超时时间。
+6. 没有任务可执行时睡眠的时间。
+7. 任务执行失败之后的重试次数。
+8. 均衡策略。
+9. worker 是否在维护模式下运行。
 
-You have three options:
+#### 什么是均衡策略？
 
-1. No balancing.
-2. Simple Balancing.
-3. Auto Balancing.
+你有下面三个选项：
 
-In case you don't want to balance, a supervisor will have a single pool of workers processes running jobs from all the supervised queues at the same time.
+1. 没有均衡
+2. 简单均衡
+3. 自动均衡
 
-However in case you chose `simple` as your balancing strategy, Horizon will create a process pool for every queue, so for example if your supervisor should be working on the `emails` & `notifications` queues and you set the number of processes to be 4, Horizon will create two process pools each one monitoring 2 worker processes.
+如果你不想要均衡负载，那监督者会让一个 worker 来同时处理所有队列中的任务。
 
-If you want Horizon to distribute the load based on how busy a queue is, choose the `auto` balancing strategy and Horizon will continuously check how busy your queues are and move some workers assigned to a non-busy queue to process jobs from another busy queue until things are back to normal.
+但是，如果你选择 `simple` 作为均衡策略，Horizon 会为每个队列创建一个进程池。也就是说，如果你的监督者要处理 `emails` 和 `notifications` 两个队列，而你又将进程数设置为 4，那 Horizon 会创建有两个进程池，每个进程池分别监控两个 worker。
 
-At all times every process pool will have at least the minimum number of processes you added in your configuration file, this number can be at least 1 and it's set to 1 by default.
+如果你希望 Horizon 根据队列的繁忙程度来分配负载，就选择 `auto` 均衡策略。Horizon 会不断地检查队列的繁忙程度，并将一些 worker 从不繁忙的队列中抽出来分配给繁忙的队列去处理任务，直到这些队列都恢复平静。
 
-# The Master Supervisor
+在任何时候，每个进程池至少具有在配置文件中添加的最少进程数，这数字至少要为 1，默认情况下的设置也是为 1。
 
-The Master's job is to start the supervisors and make sure they keep doing their job, when you run the `horizon` command your configuration file is scanned and an `AddSupervisor` job is dispatched to a special queue for every supervisor that needs to be added, this queue is constantly checked by the Master and the jobs inside it are executed on every loop of the master process.
+# 主监督者
 
-Before starting the loop a number of pcntl signal listeners are registered, Horizon uses these signals to know when to restart, pause, terminate, or continue a paused state.
+主监督者的工作是启动监督者，并确保它们继续做好自己的工作。当你运行 `horizon` 命令时，你的配置文件会被扫描，另外 `AddSupervisor` 任务会被分配到每个需要添加监督者的特殊队列中去。主监督者会不断检查这个队列，并让其中的任务在主进程的每个循环上执行。
+
+在开始循环之前，注册了很多 pcntl 信号监听器，Horizon 使用这些信号来确认何时重启、暂停、终止或者继续暂停状态。
 
 ```Php
 pcntl_signal(SIGTERM, function () {
@@ -79,28 +80,30 @@ pcntl_signal(SIGCONT, function () {
 });
 ```
 
-Inside the loop, the master processes any pending jobs in its special queue, monitors child supervisor processes, and fires the `MasterSupervisorLooped` event after each iteration.
+在循环内部，主处理器处理其特殊队列中的所有挂起的任务，监视子监督者的进程，并在每次迭代后触发 `MasterSupervisorLooped` 事件。
 
-The `AddSupervisor` command that gets pushed to the master queue is ran at this point, it simply creates a new Symfony Process that runs `php artisan horizon:supervisor` for each supervisor, this process is passed to a class called `SupervisorProcess` whose job is to ensure that Symfony process is always running. Finally that instance of `SupervisorProcess` is stored into a `supervisors` array property on the `MasterSupervisor` instance.
+此时 `AddSupervisor` 命令会被推送到主队列运行，为每个监督者创建了一个运行 `php artisan horizon:supervisor` 命令的 Symfony 进程，这个命令通过调用名为 `SupervisorProcess` 的类，来确保 Symfony 进程始终在运行。最后，`SupervisorProcess` 的实例存储在 `MasterSupervisor` 实例的 `supervisors` 数组的属性中。
 
-# Starting Supervisors
+# 启动监督者
 
-While the master supervisor is looping, Horizon will call the `monitor()` method on all these `SupervisorProcess` instances, this method makes sure the `horizon:supervisor` process is running, it also takes care of restarting & terminating it as well as re-provisioning it in case the configuration file was changed.
+当主监督者循环时，Horizon 将在所有 `SupervisorProcess` 实例上调用 `monitor()` 方法，这个方法确保了 `horizon:supervisor` 程序进程正在运行，它还负责重新启动和终止，以及在配置文件更改时重新配置它。
 
 The `horizon:Supervisor` command creates a `Supervisor` instance and starts creating the processes pools used to run & monitor this supervisor workers, the configuration of process pools depends on your provided balancing strategy.
 
-### Initial scaling of a supervisor
+ `horizon:Supervisor` 命令创建一个 `Supervisor` 实例，并开始创建进程池用于运行和监视这个监督者下面的 workers，进程池的配置取决于你提供的均衡策略。
 
-Initially Horizon will check if you use any kind of balancing, if so it'll create a process pool for each of the queues the supervisor is configured to work on, once the process pools are created Horizon will create multiple `WorkerProcess` for each pool by dividing the number of total processes over the number of pools.
+### 监督者初始行为
 
-# Running the supervisor loop
+一开始 Horizon 会检查你是否使用任何类型的均衡，如果有，它会配置监督者所处理的每个队列创建一个进程池。创建进程池后，Horizon 将通过将总进程数除以池数来为每个池创建多个 `WorkerProcess`。
 
-Once the supervisor is ready to run, Horizon registers some pcntl signal listeners and starts a loop where it does the following:
+# 运行 supervisor 循环
 
-- Processes any Supervisor related commands.
-- Starts Monitoring each process pool.
-- Handles balancing if we're running the auto-balancing strategy.
+一旦监督者准备好运行，Horizon 就会注册一些 pcntl 信号监听器并启动一个循环，它会执行以下操作：
 
-Each supervisor has a special queue too where Horizon pushes jobs for it to execute, an example is when Horizon wants a Supervisor to terminate it pushed a `Terminate` command and the supervisor runs it to ensure safe termination of the process.
+- 处理任何与 Supervisor 相关的命令。
+- 开始监控每个进程池。
+- 如果有正在运行的自动均衡策略，就处理均衡。
 
-Each process pool will loop over its worker processes and make sure they're running, a worker process is simply a `php artisan queue:work` command running as a daemon in the background.
+> 每个监督者都有一个特殊队列，Horizon 会推送任务来执行它。例如当 Horizon 希望监督者终止时，便会推送一个 `Terminate` 命令并运行，以确保监督者安全终止其进程。
+
+每个进程池会遍历 worker 的进程并确保它们正在运行，使用  `php artisan queue:work`  命令，就能让 worker 作为守护进程在后台运行。
