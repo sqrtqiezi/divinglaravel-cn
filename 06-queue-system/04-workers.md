@@ -1,39 +1,39 @@
 # Workers
 
-Now that we learnt how Laravel pushes jobs into different queues, let's perform a dive into how workers run your jobs. First I'd like to define workers as a simple PHP process that runs in the background with the purpose of extracting jobs from a storage space and run them with respect to several configuration options.
+现在我们已经了解了 Laravel 如何将任务推进不同的队列，接下来我们继续深入了解 worker 是如何运作的。首先，我想将 worker 定义为一个简单的PHP进程，它在后台运行，目的是从存储空间中提取任务，并根据几个配置选项运行它们。
 
 ```
 php artisan queue:work
 ```
 
-Running this command will instruct Laravel to create an instance of your application and start executing jobs, this instance will stay alive indefinitely which means the action of starting your Laravel application happens only once when the command was run & the same instance will be used to execute your jobs, that means the following:
+运行这个命令后，Laravel 会在你的应用程序上创建实例并开始执行任务，这个实例会将无限期保持活动状态，这意味着启动这个命令的操作仅在 Laravel 应用程序中发生一次，并且将使用相同的实例执行你的任务，这意味着以下几点：
 
-- You save server resources by avoiding booting up the whole app on every job.
-- You have to manually restart the worker to reflect any code change you made in your application.
+- 你要避免在每个任务上启动整个应用程序来节省服务器资源。
+- 你必须手动重新启动 worker 让使你在应用程序中所做的任何代码的更改生效。
 
-You can also run:
+你也可以运行：
 
 ```
 php artisan queue:work --once
 ```
 
-This will start an instance of the application, process a single job, and then kill the script.
+这会启动应用程序的实例，处理单个任务，然后终止该脚本。
 
 ```
 php artisan queue:listen
 ```
 
-The `queue:listen` command simply runs the `queue:work --once` command inside an infinite loop, this will cause the following:
+`queue:listen` 命令只是在无限循环中运行 `queue:work --once` 命令，这将导致以下结果：
 
-- An instance of the app is booted up on every loop.
-- The assigned worker will pick a single job and execute it.
-- The worker process will be killed.
+- 每个循环都会启动应用程序的一个实例。
+- 被分配的 worker 会选择一个任务并执行它。
+- 工作进程将被杀死。
 
-Using `queue:listen` ensures that a new instance of the app is created for every job, that means you don't have to manually restart the worker in case you made changes to your code, but also means more server resources will be consumed.
+使用 `queue:listen` 确保为每个任务创建应用程序的新实例，这意味着你不必因为更改代码而手动重新启动 worker，同时这也意味着会消耗更多的服务器资源。
 
-# The queue:work command
+# queue:work 命令
 
-Let's take a look at the `handle()` method of the `Queue\Console\WorkCommand` class, it's the method that'll be executed when you run `php artisan queue:work`:
+让我们看一下  `Queue\Console\WorkCommand` 类的 `handle()` 方法，它是在运行 `php artisan queue:work` 时执行的方法：
 
 ```
 public function handle()
@@ -55,9 +55,9 @@ public function handle()
 }
 ```
 
-First, we check if the application is in maintenance mode & the `--once` option is used, in that case we want the script to die gracefully so we don't execute any jobs, for that reason we'll just ask the worker to sleep for a given period before killing the script entirely.
+首先，我们检查应用程序是否处于维护模式并使用 `--once` 选项。在这种情况下，我们希望不执行任何任务，脚本能优雅地死亡，因此我们只需要求 worker 在完全杀死脚本之前睡眠一段时间。
 
-Here's how the `sleep()` method of `Queue\Worker` looks like:
+以下是 `Queue\Worker` 的 `sleep()` 方法如下所示：
 
 ```
 public function sleep($seconds)
@@ -66,22 +66,22 @@ public function sleep($seconds)
 }
 ```
 
-#### Why don't we just return null in the handle() method to kill the script?
+#### 为什么不在 handle() 方法中返回 null 来杀死脚本？ 
 
-As we said earlier the `queue:listen` command runs the `WorkCommand` inside a loop:
+正如我们之前所说的 `queue:listen` 命令是在循环中运行 `WorkCommand`：
 
 ```
 while (true) {
-     // This process simply calls 'php artisan queue:work --once'
+     // 这个过程简单地调用了 'php artisan queue:work --once'
     $this->runProcess($process, $options->memory);
 }
 ```
 
-If the app is in maintenance mode and the `WorkCommand` terminated immediately this will cause the loop to end and a next one starts in a very short time, it's better that we cause some delay in that case instead of consuming the server resources by creating tons of application instances that we won't really use.
+如果应用程序处于维护模式时 `WorkCommand` 立即终止，会导致循环结束并且下一个循环会在很短的时间内启动。最好的做法是我们在这种情况下造成一些延迟，而不是通过创建大量我们不会真正使用的应用程序实例来消耗服务器资源。
 
-## Listening for events
+## 监听事件
 
-Inside the `handle()` method we call the `listenForEvents()` method:
+在 `handle()` 中我们调用 `listenForEvents()` 方法：
 
 ```
 protected function listenForEvents()
@@ -102,11 +102,11 @@ protected function listenForEvents()
 }
 ```
 
-In this method we listen to several events our workers will fire down the road, this will allow us to print some information to the user every time a job is being processed, passed, or failed.
+在这个方法中我们监听几个会导致 worker 停止运行的事件，有了这个我们就能在每次处理、传递或失败作业时向用户打印一些信息。
 
-## Logging failed jobs
+## 记录失败任务
 
-In case a job fails, the `logFailedJob()` method is called:
+如果任务失败，就会调用 `logFailedJob()` 方法：
 
 ```
 $this->laravel['queue.failer']->log(
@@ -115,7 +115,7 @@ $this->laravel['queue.failer']->log(
 );
 ```
 
-The `queue.failer` container alias is registered in `Queue\QueueServiceProvider::registerFailedJobServices()`:
+`queue.failer` 容器别名注册在 `Queue\QueueServiceProvider::registerFailedJobServices()`：
 
 ```
 protected function registerFailedJobServices()
@@ -130,7 +130,7 @@ protected function registerFailedJobServices()
 }
 
 /**
- * Create a new database failed job provider.
+ * 创建新的 databaseFailedJobProvider
  *
  * @param  array  $config
  * @return \Illuminate\Queue\Failed\DatabaseFailedJobProvider
@@ -143,7 +143,7 @@ protected function databaseFailedJobProvider($config)
 }
 ```
 
-In case the `queue.failed` configuration value is set, the database queue failer will be used and it simply stores information about the failed job in a database table:
+如果设置了 `queue.failed` 配置值，将使用数据库队列 failer，它只将失败任务的信息存储在数据库表中：
 
 ```
 $this->getTable()->insertGetId(compact(
@@ -151,18 +151,18 @@ $this->getTable()->insertGetId(compact(
 ));
 ```
 
-## Running the worker
+## 运行 worker
 
-To run the worker we need to collect two pieces of information:
+要运行 worker，我们需要收集两条信息：
 
-- The connection this worker will be pulling jobs from
-- The queue the worker will use to find jobs
+- worker 拉取任务的连接
+- worker 用于查找任务的队列
 
-You can provide a `--connection=default` option to the `queue:work` command, but in case you didn't the default collection defined in the `queue.default` configuration value will be used.
+你可以为 `queue:work` 命令提供 `--connection=default` 选项。如果没有，则将使用 `queue.default` 配置值中定义的默认集合。
 
-Same for the queue, you can provide a `--queue=emails` option or the `queue` option set in your selected connection configuration will be used.
+至于队列，你可以提供 `--queue=emails` 选项，否则会使用在所选连接配置中设置的 `queue` 选项。
 
-Once all this is done, the `WorkCommand::handle()` method runs `runWorker()`:
+完成所有这些之后，`WorkCommand::handle()` 方法会运行 `runWorker()`：
 
 ```
 protected function runWorker($connection, $queue)
@@ -175,7 +175,7 @@ protected function runWorker($connection, $queue)
 }
 ```
 
-The worker class property is set while the command is being constructed:
+在构造函数中设置 worker 类属性：
 
 ```
 public function __construct(Worker $worker)
@@ -186,11 +186,11 @@ public function __construct(Worker $worker)
 }
 ```
 
-The container resolves an instance of `Queue\Worker`, inside `runWorker()` we set the cache driver the worker will use, we also decide what method we'll call to based on the `--once` command option.
+容器解析了 `Queue\Worker` 的实例，在 `runWorker()` 中我们设置了 worker 使用的缓存驱动程序，我们还根据 `--once` 命令选项决定我们将调用哪种方法。
 
-In case the `--once` option is used we'll just call `runNextJob` to run the next available job and then the script dies. Otherwise we'll call the `daemon` method which will keep the process alive processing jobs all the time.
+如果使用 `--once` 选项，我们只需调用 `runNextJob` 来运行下一个可用任务，然后脚本就会死掉。否则，我们将调用 `daemon` 方法，这个方法将始终保持进程处理状态。
 
-While starting the worker we gather the command options given by the user using the `gatherWorkerOptions()` method, we later provide these options the worker `runNextJob` or `daemon` methods.
+在启动 worker 时，我们使用 `gatherWorkerOptions()` 方法收集用户给出的命令选项，之后我们会为 worker 的 `runNextJob` or `daemon` 方法提供这些选项。
 
 ```
 protected function gatherWorkerOptions()
@@ -203,9 +203,9 @@ protected function gatherWorkerOptions()
 }
 ```
 
-## The Daemon
+## 守护进程
 
-Let's take a look at the `Worker::daemon()` method, first line in this method calls the `listenForSignals()` method:
+让我们看一下 `Worker::daemon()` 方法的第一行调用的 `listenForSignals()` 方法：
 
 ```
 protected function listenForSignals()
@@ -228,19 +228,19 @@ protected function listenForSignals()
 }
 ```
 
-This method uses PHP7.1's signal handlers, the `supportsAsyncSignals()` method checks if we're on PHP7.1 and that the `pcntl` extension is loaded.
+这个方法使用 PHP7.1 的信号处理程序，`supportsAsyncSignals()` 方法检查我们是否使用 PHP7.1 并且加载了 `pcntl` 扩展。
 
-`pcntl_async_signals()` is later called to enable signal handling, then we register handlers for multiple signals:
+接下来调用的 `pcntl_async_signals()` 来启用信号处理，然后我们为多个信号注册处理程序：
 
-- `SIGTERM` is raised when the script is instructed to shutdown.
-- `SIGUSR2` is a user-defined signal Laravel uses to indicate that the script should pause.
-- `SIGCONT` is raised when a paused script should proceed.
+- 指示脚本关闭时会引发 `SIGTERM`。
+- `SIGUSR2` 是 Laravel 用来指示脚本应该暂停的用户定义信号。
+- 当暂停的脚本继续时，会引发 `SIGCONT`。
 
-These signals are sent from a Process Monitor such as [Supervisor](http://supervisord.org/) to communicate with our script.
+这些信号从 [Supervisor](http://supervisord.org/) 等进程监视器发送与我们的脚本进行通信。
 
-Second line in the `Worker::daemon()` method fetches the timestamp of last queue restart, this value is stored in the cache when we call the `queue:restart`, later on we'll check if the timestamp of last restart doesn't match which indicates that the worker should restart, more on that later.
+`Worker::daemon()` 方法中的第二行获取上次队列重启的时间戳，当我们调用 `queue:restart` 时，该值存储在缓存中，然后就检查上次重启的时间戳是否不匹配，这表明 worker 应该重新启动。稍后再详细说明一下~
 
-Finally the method starts a loop where we'll do the rest of the work of fetching jobs, running them, and do several actions on the worker process.
+最后，该方法启动一个循环，我们将完成其他工作，即获取任务、运行它们，并对 worker 进程执行多项操作。
 
 ```
 while (true) {
@@ -266,29 +266,29 @@ while (true) {
 }
 ```
 
-### Determining if the worker should process jobs
+### 决定 worker 是否应该处理任务
 
-Calling `daemonShouldRun()` we check for the following cases:
+要调用 `daemonShouldRun()` 我们得先检查以下情况：
 
-- Application is not in maintenance mode
-- Worker is not paused
-- No event listeners preventing the loop from continuing
+- 应用程序未处于维护模式
+- Worker 没有暂停
+- 没有事件监听器阻止循环继续
 
-If app in maintenance mode you can still process jobs if your worker run with the `--force` option:
+如果 app 处于维护模式，如果 worker 使用 `--force` 选项运行，你仍然可以处理任务：
 
 ```
 php artisan queue:work --force
 ```
 
-One of the conditions determining if the worker should continue is the following:
+确定 worker 是否应该继续的条件之一是：
 
 ```
 $this->events->until(new Events\Looping($connectionName, $queue)) === false)
 ```
 
-This line fires a `Queue\Event\Looping` event and checks if any of the listeners return false in its `handle()` method, using this fact you can occasionally force your workers to stop processing jobs temporarily.
+这行代码触发 `Queue\Event\Looping` 事件，用来检查是否有任何监听器在其 `handle()` 方法中返回 false。利用这个方法可以强制 worker 暂时停止处理作业。
 
-In case the worker should pause, the `pauseWorker()` method is called:
+如果 worker 应该暂停，则调用 `pauseWorker()` 方法： 
 
 ```
 protected function pauseWorker(WorkerOptions $options, $lastRestart)
@@ -299,7 +299,7 @@ protected function pauseWorker(WorkerOptions $options, $lastRestart)
 }
 ```
 
-This method calls the `sleep` method and passes the `--sleep` option given to the console command:
+这个方法调用 `sleep` 并传递给控制台命令的 `--sleep`：
 
 ```
 public function sleep($seconds)
@@ -308,7 +308,7 @@ public function sleep($seconds)
 }
 ```
 
-After the script sleeps for a while, we check if the worker should quit and kill the script in that case, we'll look into the `stopIfNecessary` method later, in case the script shouldn't be killed we'll just call `continue;` to start a new loop:
+在脚本休眠一段时间之后，我们检查 worker 是否应该退出并在这种情况下终止脚本。 `stopIfNecessary` 方法等下再看。假设脚本不应该被杀死，我们只需要调用 `continue;` 开始一个新的循环：
 
 ```
 if (! $this->daemonShouldRun($options, $connectionName, $queue)) {
@@ -318,7 +318,7 @@ if (! $this->daemonShouldRun($options, $connectionName, $queue)) {
 }
 ```
 
-### Retrieving a job to run
+### 检索要运行的作业
 
 ```
 $job = $this->getNextJob(
@@ -326,7 +326,7 @@ $job = $this->getNextJob(
 );
 ```
 
-The `getNextJob()` method accepts an instance of the desired queue connection and the queue we should fetch jobs from:
+`getNextJob()` 方法接受所需队列连接的实例以及我们应从中获取任务的队列：
 
 ```
 protected function getNextJob($connection, $queue)
@@ -345,20 +345,20 @@ protected function getNextJob($connection, $queue)
 }
 ```
 
-We simply loop on the given queue(s), use the selected queue connection to get a job from the storage space (database, redis, sqs, ...) and return that job.
+我们只是循环使用给定的队列，使用选定的队列连接从存储空间（database、redis、sqs……）获取任务并返回任务。
 
-To retrieve a job from storage we query for the oldest job that meets the following conditions:
+要从存储中检索作业，我们会查询满足以下条件的最早的任务：
 
-- Pushed to the `queue` we're trying to find jobs within
-- Not reserved by another worker
-- Available to be run at the given time, some jobs are delayed to run in the future
-- We also get jobs that are reserved for a long time they became frozen so we retry them
+- 推到 `queue` 我们正在努力找的任务
+- 不是由另一个 woker 保留的
+- 可以在给定时间运行，某些作业将在未来延迟运行
+- 我们也获得了长期保留的工作，他们被冻结，所以我们重试它们
 
-Once we find a job that meets this criteria we mark this job as reserved so that other workers don't pick it up, we also increment the number of attempts of the job for monitoring.
+一旦我们找到符合此条件的任务，我们会将此任务标记为已保留，这样不会被其他 worker 提取，我们也会增加该任务的尝试次数以进行监控。
 
-### Monitoring jobs timeout
+### 监控任务超时
 
-After the next job is retrieved, we call the `registerTimeoutHandler()` method:
+检索下一个任务后，我们调用 `registerTimeoutHandler()` 方法：
 
 ```
 protected function registerTimeoutHandler($job, WorkerOptions $options)
@@ -375,15 +375,15 @@ protected function registerTimeoutHandler($job, WorkerOptions $options)
 }
 ```
 
-Again if the `pcntl` extension is loaded, we'll register a signal handler that kills the worker process if the job timed out, we use `pcntl_alarm()` to send a `SIGALRM` signal after the configured timeout is passed.
+如果加载 `pcntl` 扩展，我们将注册一个信号处理程序。如果任务超时，则杀死工作进程。我们使用 `pcntl_alarm()` 发送 `SIGALRM` 信号来传递配置超时。
 
-If the job took longer than the timeout value the handler will kill the script, if not the job will pass and the next loop will set a new alarm overriding the first one since a single alarm can be present in the process.
+如果任务花费的时间长于超时值，则处理程序会终止该脚本。如果不是，任务将通过并且在下一个循环设置覆盖第一个的新警报，因为在该过程中可以存在单个警报。
 
-Jobs timeout only work on PHP7.1 or above, it also doesn't work on Windows ¯\_(ツ)_/¯
+> 任务超时仅适用于 PHP7.1 或更高版本，它也不适用于 Windows ¯_(ツ)_/¯
 
-### Processing a job
+### 处理任务
 
-The `runJob()` method calls `process()`:
+`runJob()` 方法调用 `process()`:
 
 ```
 public function process($connectionName, $job, WorkerOptions $options)
@@ -404,9 +404,9 @@ public function process($connectionName, $job, WorkerOptions $options)
 }
 ```
 
-Here `raiseBeforeJobEvent()` fires the `Queue\Events\JobProcessing` event, and `raiseAfterJobEvent()` fires the `Queue\Events\JobProcessed` event.
+这里 `raiseBeforeJobEvent()` 触发 `Queue\Events\JobProcessing` 事件，`raiseAfterJobEvent()` 触发 `Queue\Events\JobProcessed` 事件。
 
-`markJobAsFailedIfAlreadyExceedsMaxAttempts()` checks if the process already reached the maximum attempts and mark the job as failed in that case:
+`markJobAsFailedIfAlreadyExceedsMaxAttempts()` 检查进程是否已达到最大重试次数，而且在这种情况下会讲任务标记为失败：
 
 ```
 protected function markJobAsFailedIfAlreadyExceedsMaxAttempts($connectionName, $job, $maxTries)
@@ -425,15 +425,15 @@ protected function markJobAsFailedIfAlreadyExceedsMaxAttempts($connectionName, $
 }
 ```
 
-Otherwise we call the `fire()` method on the job object to run the job.
+否则，我们在任务对象上调用 `fire()` 方法来运行任务。
 
-#### Where did we get this job object?
+#### 那我们从哪里得到这个任务对象？
 
-The `getNextJob()` method returns an instance of `Contracts\Queue\Job`, depends on the queue driver we use the respective Job instance will be used, for example `Queue\Jobs\DatabaseJob` in case the Database queue driver is selected.
+`getNextJob()` 方法返回 `Contracts\Queue\Job` 的实例，取决于我们使用的队列驱动程序使用相应的任务实例。例如，如果选择了数据库队列驱动程序，则为 `Queue\Jobs\DatabaseJob`。
 
-### End of loop
+### 循环结束
 
-At the end of the loop we call `stopIfNecessary()` to check if we should kill the process before the next loop starts:
+在循环结束时，我们调用 `stopIfNecessary()` 来检查是否应该在下一个循环开始之前终止进程：
 
 ```
 protected function stopIfNecessary(WorkerOptions $options, $lastRestart)
@@ -450,7 +450,7 @@ protected function stopIfNecessary(WorkerOptions $options, $lastRestart)
 }
 ```
 
-The `shouldQuit` property is set in two situations, first as a signal handler for the `SIGTERM` signal set inside `listenForSignals()`, second inside `stopWorkerIfLostConnection()`:
+`shouldQuit` 属性设置在两种情况下使用，一个作为 `listenForSignals()` 内 `SIGTERM` 信号集的信号处理程序，另一个在 `stopWorkerIfLostConnection()` 中：
 
 ```
 protected function stopWorkerIfLostConnection($e)
@@ -461,10 +461,10 @@ protected function stopWorkerIfLostConnection($e)
 }
 ```
 
-This method is called in several try...catch statements while retrieving and processing jobs to ensure that the worker should die so that our Process Control may start a new one with a fresh database connection.
+在检索和处理作业时，在几个 try … catch 语句中调用此方法，以确保 worker 程序应该被杀死，以便我们的过程控制可以使用新的数据库连接启动新的过程控制。
 
-The `causedByLostConnection()` method can be found in the `Database\DetectsLostConnections` trait.
+`causedByLostConnection()` 方法能在 `Database\DetectsLostConnections` trait 中被找到。
 
-`memoryExceeded()` checks if memory usage exceeded the current set memory limit, you can set the limit using the `--memory` option on the `queue:work` command.
+`memoryExceeded()` 检查内存使用量是否超过当前设置的内存限制，可以使用 `queue:work` 命令中的 `--memory` 选项设置限制。
 
-Finally `queueShouldRestart()` compares the current timestamp of a restart signal and if it doesn't match the time we stored while starting the worker process this means that a new restart signal was sent during the loop, in that case we kill the process so that it can be restarted by the Process Control later.
+最后 `queueShouldRestart()` 比较重启信号的当前时间戳，如果它与我们在启动工作进程时存储的时间不匹配，这意味着在循环期间发送了一个新的重启信号，在这种情况下，我们终止进程，以便稍后由过程控制重新启动它。
