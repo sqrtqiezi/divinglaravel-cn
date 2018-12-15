@@ -38,7 +38,7 @@ CRON 是一个守护进程，它驻留在你的 Linux 服务器中。大部分�
 - `0 1,15 * * *` 表示该任务应该分别在每天上午 1 点和下午 3 点运行。
 - `*/10 * * * *` 表示该任务应该每 10 分钟运行一次。
 
-#### 那接下来我们为我们的任务注册一个 cron 任务？
+#### 那接下来为我们的任务注册一个 cron 任务？
 
 我们可以在 crontab 文件中注册这个：
 
@@ -76,7 +76,7 @@ protected function schedule(Schedule $schedule)
 当 Console 中的 Kernel 实例被实例化时，Laravel 向 Kernel 的 `booted` 事件注册一个监听器，该事件将 Scheduler 绑定到容器并调用 Kernel 的 `schedule()` 方法：
 
 ```php
-// in Illuminate\Foundation\Console\Kernel
+// Illuminate\Foundation\Console\Kernel
 
 public function __construct(Application $app, Dispatcher $events)
 {
@@ -87,19 +87,19 @@ public function __construct(Application $app, Dispatcher $events)
 
 protected function defineConsoleSchedule()
 {
-     // Register the Scheduler in the Container
+     // 在容器中注册 Scheduler
     $this->app->instance(
         Schedule::class, $schedule = new Schedule($this->app[Cache::class])
     );
 
-     // Call the schedule() method that we override in our App\Console\Kernel
+     // 调用我们在 App\Console\Kernel 中覆盖的 schedule() 方法 
     $this->schedule($schedule);
 }
 ```
 
 一旦终端内核完成 Kernel 类中定义的引导序列，就会触发这个 `booted` 事件。
 
-> 在 Kernel 的 handle() 方法中，Laravel 会检查 Foundation\Application 是否已启动，如果不是，就调用应用程序的 bootstrapWith() 方法，并传递在 console Kernel 中定义的引导程序数组。
+> 在 Kernel 的 handle() 方法中，Laravel 会检查 Foundation\Application 是否已启动。如果不是，就调用应用程序的 bootstrapWith() 方法，并传递 console Kernel 中定义的 bootstrappers 数组。
 
 #### 简单的说：
 
