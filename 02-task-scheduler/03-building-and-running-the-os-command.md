@@ -10,7 +10,7 @@
 
 #### 什么时候需要在后台运行命令？
 
-想象一下，如果有几个任务在每个小时中同时运行。默认设置 Laravel 会通知操作系统逐个运行命令：
+想象一下，如果你有几个任务需要同时运行，比如说每小时一次。默认设置下，Laravel 会通知操作系统逐个运行命令：
 
 ```bash
 ~ php artisan update:coupons
@@ -27,9 +27,9 @@
 ~ php artisan send:mail &
 ```
 
-使用命令末尾的＆符号可以继续推送命令，而无需等待初始化完成。
+在命令末尾加上 ＆符号可以无需等待初始化完成继续推送命令。
 
-`run()` 方法检查 `runInBackground` 属性的值，并决定下一个调用哪个方法， `runCommandInForeground()` 或 `runCommandInBackground()`。
+`run()` 方法检查 `runInBackground` 属性的值来决定接下来要调用 `runCommandInForeground()` 还是 `runCommandInBackground()`。
 
 如果命令要在前台运行，那剩下的部分就简单些：
 
@@ -45,17 +45,17 @@ $this->callAfterCallbacks($container);
 
 Laravel 会先执行 `callBeforeCallbacks `，将命令发送到操作系统之后再来执行 `callAfterCallbacks`。
 
-但是，如果命令是在后台运行，Laravel 调用 `callBeforeCallbacks()`，发送命令，但不会调用后回调，原因是你可能会想，因为命令将在后台执行，所以如果我们调用 `callAfterCallbacks()` 此时它将不会在命令完成后运行，一旦命令发送到操作系统，它将运行。
+但是，如果命令是在后台运行，Laravel 调用 `callBeforeCallbacks()`，发送命令，但不会调用 `callAfterCallbacks`。因为命令将在后台执行，如果我们此时调用 `callAfterCallbacks()`，它就不会在命令完成后运行，而是命令发送到操作系统，它就运行。
 
-#### 那么当我们在后台运行命令没有回调执行怎么办？
+#### 当我们在后台运行命令时，回调会不执行？
 
-照样运行。Laravel 使用另一个命令运行后，原来会被完成：
+照样运行。Laravel 使用下面这样的命令运行后，原来会被完成：
 
 ```bash
 (php artisan update:coupons ; php artisan schedule:finish eventMutex) &
 ```
 
-这个命令会导致一系列的两个命令一个接一个地在后台运行，所以当你的 `update:coupons` 命令完成之后，`schedule:finish` 命令会运行当前事件的 Mutex，Laravel 定位事件会使用此 ID 并运行其回调。
+这个命令会导致一系列的两个命令一个接一个地在后台运行。也就是说，当你的 `update:coupons` 命令完成之后，`schedule:finish` 命令会运行给定当前事件的互斥锁，Laravel 定位事件会使用此 ID 并运行其回调。
 
 ## 构建命令字符串
 
@@ -67,31 +67,31 @@ return (new CommandBuilder)->buildCommand($this);
 
 要构建命令，需要知道以下配置：
 
-* mutex 命令
+* 命令互斥锁
 * 输出应发送到的位置
 * 确定输出是否应该附加
 * 用户运行命令
 * 后台与前台
 
-### mutex 命令
+### 命令互斥锁
 
-mutex 是每个命令的唯一 ID 集，Laravel 主要使用它来防止重叠命令（我们稍后再讨论这个）同时 mutex 也使用它作为命令的唯一 ID。
+互斥锁是为每个命令设置的唯一 ID，Laravel 主要使用它来防止命令重叠（我们稍后再讨论这个）。同时互斥锁也将它用作命令的唯一 ID。
 
-Laravel 在 `Event::mutexName()` 方法中的每个命令都定义了 mutex  ：
+Laravel 在 `Event::mutexName()` 方法中定义了每个命令的互斥锁：
 
 ```php
 return 'framework'.DIRECTORY_SEPARATOR.'schedule-'.sha1($this->expression.$this->command);
 ```
 
-也就是事件 CRON 的表达式和命令字符串的组合。
+也就是说，互斥锁是事件的 CRON 的表达式和命令字符串的组合。
 
-而对于回调事件，mutex 的创建如下：
+而对于回调事件，互斥锁的创建如下：
 
 ```php
 return 'framework/schedule-'.sha1($this->description);
 ```
 
-所以为了确保你的回调事件有一个正确的 mutex ，你需要为命令设置一个描述：
+所以，为了确保你的回调事件设置了正确的互斥锁，你需要为命令设置描述：
 
 ```php
 $schedule->call(function () {
@@ -101,7 +101,7 @@ $schedule->call(function () {
 
 ### 处理输出
 
-默认情况下，命令的输出任务被发送到 `/dev/null` ，这是一个丢弃写入数据的特殊文件，但是如果要在某个地方发送命令输出任务，可以在定义命令时使用 `sendOutputTo()` 方法进行更改：
+默认情况下，命令的输出会被发送到 `/dev/null` ，这是一个丢弃写入数据的特殊文件。但是，如果要在某个地方发送命令输出，可以在定义命令时使用 `sendOutputTo()` 方法进行更改：
 
 ```php
 $schedule->command('mail:send')->sendOutputTo('/home/scheduler.log');
@@ -147,7 +147,7 @@ sudo -u forge -- sh -c 'php artisan mail:send >> /home/scheduler.log 2>&1'
 (php artisan update:coupons >> /home/scheduler.log 2>&1 ; php artisan schedule:finish eventMutex) > /dev/null 2>&1  &
 ```
 
-或者如果你没有将其设置为附加输出 &，它不会定义自定义目标：
+或者如果你没有将其设置 & 附加输出，它不会定义自定义目标：
 
 ```bash
 (php artisan update:coupons > /dev/null 2>&1 ; php artisan schedule:finish eventMutex) > /dev/null 2>&1  &
@@ -161,7 +161,7 @@ sudo -u forge -- sh -c 'php artisan mail:send >> /home/scheduler.log 2>&1'
 $schedule->command('mail:send')->emailOutputTo(['myemail@mail.com', 'myOtheremail@mail.com']);
 ```
 
-> 如果有一个输出操作，你想只是收到电子邮件，而不看到输出的内容，你可以使用 `emailWrittenOutputTo()`，这样你看到的只是通知这个命令运行的内容。
+> 如果你只是想收到电子邮件，而不看到输出的内容，可以使用 `emailWrittenOutputTo()`，这样你看到的只是通知这个命令运行的内容。
 
 此方法会更新调度事件的输出属性并将其指向 `storage/logs` 目录中的文件：
 
