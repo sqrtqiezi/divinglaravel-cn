@@ -20,30 +20,28 @@ class TestNotification extends Notification
 }
 ```
 
-`via()` 方法用于设置指示 Laravel 使用的发送通知的渠道，而且你也可以定义多种方法来自定义每个渠道该如何发送通知。
-
-It all starts in `Illuminate\Notifications\ChannelManager` which implements two interfaces:
+`via()` 方法用于设置 Laravel 发送通知的渠道，而且你也可以定义多种方法来自定义每个渠道该如何发送通知。
 
 所有的一切都在 `Illuminate\Notifications\ChannelManager`  中开始的，它实现了两个接口：
 
 * `Illuminate\Contracts\Notifications\Dispatcher`
 * `Illuminate\Contracts\Notifications\Factory`
 
-你可以内部使用 `ChannelManager` 的 `Illuminate\Support\Facades\Notification` facade 来发送通知：
+你可以使用 `ChannelManager` 内部的 `Illuminate\Support\Facades\Notification` facade 来发送通知：
 
 ```php
 Notification::send($users, new TestNotification());
 ```
 
-`send()` 方法接受单个或者多个通知。在这个方法中，Laravel 创建了一个 `Illuminate\Notifications\NotificationSender` 实例来处理发送通知的实际操作，主要有三个步骤：
+`send()` 方法接受单个或者多个通知数组。在这个方法中，Laravel 创建了一个 `Illuminate\Notifications\NotificationSender` 实例来处理发送通知的实际操作，主要有三个步骤：
 
 * 准备通知列表
 * 确认是否应立即加入队列或直接发送通知
 * 处理发送/队列进程
 
-第一个任务很简单，它只是将给定的 `$notifiables` 值格式化成一个 Collection 数组，这样可以确保数组的值可以迭代方便以后使用。
+第一个任务很简单，它只是将给定的 `$notifiables` 值格式化成一个集合数组，这样可以确保数组的值可以迭代，方便以后使用。
 
-第二个任务也很简单，它检查我们传递的通知是否实现了 `Illuminate\Contracts\Queue\ShouldQueue`  接口，如果是，那么这意味着通知应该被发送到队列而不是立即发送。
+第二个任务也很简单，它检查我们传递的通知是否实现了 `Illuminate\Contracts\Queue\ShouldQueue`  接口，如果是，那么通知会被发送到队列而不是立即发送。
 
 第三个任务是实际工作发生的地方，我们首先发现通知加入队列的场景。
 
@@ -55,13 +53,13 @@ Notification::send($users, new TestNotification());
 2. 将通知实例发送到不同的通知驱动/通道
 3. 触发几个事件
 
-首先，Laravel 触发 `Illuminate\Notifications\Events\NotificationSending`，如果该事件的监听器返回 `false` ，则不会发送通知，可以使用这个方法进行最终检查。
+首先，Laravel 触发 `Illuminate\Notifications\Events\NotificationSending`，如果该事件的监听器返回 `false` ，则不会发送通知。你可以使用这个方法进行最终检查。
 
 发送之后，`Illuminate\Notifications\Events\NotificationSent` 事件被触发，可以使用它来进行日志记录或清理。
 
-要发送通知，发送方在渠道管理器上调用 `build()` 工厂方法，以构建应该使用的渠道的实例，然后在该渠道上调用 `send()` 方法。
+发送方在渠道管理器上调用 `build()` 工厂方法构建应该使用的渠道的实例来发送通知，然后在该渠道上调用 `send()` 方法。
 
-另外我想提一下，如果你看一下 `sendNow()` 方法，你会发现它接受第三个参数，它是应该用来指定通知的渠道，可以使用它来简单地覆盖通知类本身指定的通道，实际上即使通知类实现了 shouldQueue 接口，也可以调用 `sendNow()` 来代替 `send()` 使 Laravel 立即发送通知：
+另外我想提一下，如果你看一下 `sendNow()` 方法，你会发现这个方法的第三个参数是用来指定通知的渠道，你可以使用它来简单地覆盖通知类本身指定的渠道，实际上即使通知类实现了 shouldQueue 接口，也可以调用 `sendNow()` 来代替 `send()` 使 Laravel 立即发送通知：
 
 ```php
 Notification::sendNow($users, new TestNotification(), ['slack', 'mail']);
