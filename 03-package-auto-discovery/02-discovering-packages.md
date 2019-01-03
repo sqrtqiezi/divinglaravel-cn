@@ -1,6 +1,6 @@
 # 自动发现包
 
-在查找和安装/更新不同的包时，Composer 会触发多个事件，可以订阅并运行一段代码、甚至是一个命令行执行文件。其中有一个有趣的事件叫做  `post-autoload-dump`，在 Composer 生成项目中所有自动加载的类的最终列表之后触发。然后 Laravel 就已经可以访问所有的类，并且应用程序已经准备好处理加载到其中的所有的包类。
+在查找和安装/更新不同的包时，Composer 会触发多个可订阅的事件，例如运行一段代码、甚至是用命令行执行文件。其中有一个有趣的事件叫做  `post-autoload-dump`，在 Composer 生成你要在项目中自动加载的最终类列表后直接触发，而此时 Laravel 就已经可以访问所有的类，并且应用程序已经准备好处理加载到其中的所有的包类。
 
 从 Laravel 在 composer.json 文件中订阅这个事件开始发生了什么事情：
 
@@ -77,7 +77,30 @@ Laravel 在 HTTP 或终端内核启动时使用了两个引导程序：
 * `\Illuminate\Foundation\Bootstrap\RegisterFacades`
 * `\Illuminate\Foundation\Bootstrap\RegisterProviders`
 
-首先使用 `Illuminate\Foundation\AliasLoader` 将所有的 facades 加载到应用程序中，现在发生的改变是，Laravel 会查看生成的 `packages.php` 文件并提取所有希望 Laravel 自动发现和注册的包的别名。Laravel 用了 `PackageManifest::aliases()` 方法来搜集信息。
+首先使用 `Illuminate\Foundation\AliasLoader` 将所有的 facades 加载到应用程序中，Laravel 会查看生成的 `packages.php` 文件并提取所有希望 Laravel 自动发现和注册的包的别名。Laravel 用了 `PackageManifest::aliases()` 方法来搜集信息。
 
 同样，Laravel 也会在启动时注册服务提供者，`RegisterProviders` 引导程序调用 `Foundation\Application` 中的 `registerConfiguredProviders()` 方法，在这个方法中 Laravel 收集所有应该被自动注册的包的提供者并注册。
 
+````php
+// in RegisterFacades::bootstrap()
+
+AliasLoader::getInstance(array_merge(
+    $app->make('config')->get('app.aliases', []),
+    $app->make(PackageManifest::class)->aliases()
+))->register();
+````
+
+正如你所看到的，从 `config/app.php` 文件加载的别名与从 `PackageManifest` 类加载的别名合并。
+
+类似地，Laravel 在启动时注册服务提供器，`RegisterProviders` 引导程序调用 `Foundation\Application` 的 `registerConfiguredProviders()` 方法。Laravel 会收集所有应该自动注册的包提供器并注册它们。
+
+```php
+$providers = Collection::make($this->config['app.providers'])
+    ->partition(function ($provider) {
+        return Str::startsWith($provider, 'Illuminate\\');
+    });
+
+$providers->splice(1, 0, [$this->make(PackageManifest::class)->providers()]);
+```
+
+在这里，我们在 Illuminate 提供器和配置文件中任何可能包含的其他提供器之间注入了自动发现的提供器，这样就可以确保能通过在配置文件中重新注册它们来覆盖你的包提供程序，并且在尝试加载任何其他提供程序之前，将加载所有 Illuminate 组件。
